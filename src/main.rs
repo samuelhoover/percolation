@@ -7,33 +7,25 @@ use rand::{Rng, SeedableRng};
 fn count_clusters(arr: &mut [u32; LEN]) -> HashMap<u32, u32> {
     let mut clusters: HashMap<u32, u32> = HashMap::new();
 
-    for i in 0..LEN {
-        if arr[i] > 0 {
-            *clusters.entry(arr[i]).or_insert(0) += 1;
+    for elem in arr.iter() {
+        if *elem > 0 {
+            *clusters.entry(*elem).or_insert(0) += 1;
         }
     }
 
     clusters
 }
 
-fn sort_clusters(clusters: &HashMap<u32, u32>) -> Vec<(u32, u32)> {
-    let mut sorted_clusters: Vec<_> = clusters.iter().collect();
-    sorted_clusters.sort_by(|a, b| b.1.cmp(a.1));
-    sorted_clusters
-        .into_iter()
-        .map(|(&key, &value)| (key, value))
-        .collect()
-}
-
-fn check_percolation(arr: &[u32; LEN], clusters: &HashMap<u32, u32>) {
-    let top_row: HashSet<_> = arr[(NCOLS + 1)..(2 * NCOLS)].iter().cloned().collect();
-    let bottom_row: HashSet<_> = arr[((NROWS - 2) * (NCOLS + 1))..((NROWS - 1) * NCOLS)]
+fn check_percolation(arr: &[u32; LEN], clusters: &HashMap<u32, u32>) -> bool {
+    let top_row: HashSet<_> = arr[0..NCOLS].iter().cloned().collect();
+    let bottom_row: HashSet<_> = arr[(LEN - NCOLS)..LEN].iter().cloned().collect();
+    let left_column: HashSet<_> = arr[0..(LEN - NCOLS)].iter().step_by(NCOLS).collect();
+    let right_column: HashSet<_> = arr[(NCOLS - 1)..(LEN - NCOLS)]
         .iter()
-        .cloned()
+        .step_by(NCOLS)
         .collect();
-    let left_column: HashSet<_> = arr[NCOLS..(LEN - NCOLS)].iter().step_by(NCOLS).collect();
-    let right_column: HashSet<_> = arr[NCOLS..(LEN - NCOLS)].iter().step_by(NCOLS).collect();
 
+    let mut percolated: bool = false;
     for (&cluster_id, _) in clusters.iter() {
         let touches_top = top_row.contains(&cluster_id);
         let touches_bottom = bottom_row.contains(&cluster_id);
@@ -43,99 +35,147 @@ fn check_percolation(arr: &[u32; LEN], clusters: &HashMap<u32, u32>) {
         let percolates_vertically = touches_top && touches_bottom;
         let percolates_horizontally = touches_left && touches_right;
 
-        if percolates_vertically && percolates_horizontally {
-            println!(
-                "Cluster {:0>3} percolates both vertically and horizontally",
-                cluster_id
-            );
-        } else if percolates_vertically {
-            println!("Cluster {:0>3} percolates vertically", cluster_id);
+        if percolates_vertically {
+            // println!("Cluster {:0>3} percolates vertically", cluster_id);
+            percolated = true;
+            break;
         } else if percolates_horizontally {
-            println!("Cluster {:0>3} percolates horizontally", cluster_id);
+            // println!("Cluster {:0>3} percolates horizontally", cluster_id);
+            percolated = true;
+            break;
         }
     }
+
+    percolated
 }
 
 fn print_array(arr: &[u32; LEN]) {
-    for i in 0..LEN {
+    for (i, elem) in arr.iter().enumerate() {
         if (i + 1) % NCOLS == 0 {
-            print!("{:0>3}\n", arr[i]);
+            println!("{:0>3}", elem);
         } else {
-            print!("{:0>3} ", arr[i]);
+            print!("{:0>3} ", elem);
         }
     }
-    println!("");
 }
 
-fn clustering(arr: &mut [u32; LEN]) -> u32 {
+fn get_neigbors(&i: &usize) -> (Option<usize>, Option<usize>, Option<usize>, Option<usize>) {
+    // Get neighbors in lattice
+
+    // if index is in first row -> no "up" neighbor
+    // if index is in first column -> no "left" neighbor
+    // if index in is last row -> no "down" neighbor
+    // if index is in last column -> no "right" neighbor
+    let up: Option<usize> = if i < NCOLS { None } else { Some(i - NCOLS) };
+    let down: Option<usize> = if i >= LEN - NCOLS - 1 {
+        None
+    } else {
+        Some(i + NCOLS)
+    };
+    let left: Option<usize> = if i % NCOLS == 0 { None } else { Some(i - 1) };
+    let right: Option<usize> = if (i + 1) % NCOLS == 0 {
+        None
+    } else {
+        Some(i + 1)
+    };
+
+    (up, down, left, right)
+}
+
+fn clustering(arr: &mut [u32; LEN]) {
     let mut change: u32 = 0;
-    let mut loops: u32 = 0;
-    let mut n: usize = 0;
-    while n < LEN {
-        for i in NCOLS..(LEN - NCOLS) {
+    for _ in 0..LEN {
+        for i in 0..LEN {
             if arr[i] > 0 {
-                if arr[i - 1] > arr[i] {
-                    arr[i] = arr[i - 1];
-                    change += 1;
+                let (up, down, left, right) = get_neigbors(&i);
+
+                if let Some(left) = left {
+                    if arr[left] > arr[i] {
+                        arr[i] = arr[left];
+                        change += 1;
+                    }
                 }
-                if arr[i + 1] > arr[i] {
-                    arr[i] = arr[i + 1];
-                    change += 1;
+                if let Some(right) = right {
+                    if arr[right] > arr[i] {
+                        arr[i] = arr[right];
+                        change += 1;
+                    }
                 }
-                if arr[i - NCOLS] > arr[i] {
-                    arr[i] = arr[i - NCOLS];
-                    change += 1;
+                if let Some(down) = down {
+                    if arr[down] > arr[i] {
+                        arr[i] = arr[down];
+                        change += 1;
+                    }
                 }
-                if arr[i + NCOLS] > arr[i] {
-                    arr[i] = arr[i + NCOLS];
-                    change += 1;
+                if let Some(up) = up {
+                    if arr[up] > arr[i] {
+                        arr[i] = arr[up];
+                        change += 1;
+                    }
                 }
             }
         }
 
-        loops += 1;
         if change > 0 {
-            n += 1;
             change = 0;
         } else {
-            n = LEN;
+            // break early if clusters did not change
+            break;
         }
     }
-
-    loops
 }
 
 fn main() {
-    // TODO: start with fully blocked array, randomly open sites until percolation occurs
-
     // define PRNG
     let mut rng: SmallRng = SmallRng::from_entropy();
 
-    // create fully blocked lattice
-    let mut arr: [u32; LEN] = [0u32; LEN];
+    // store all percolation threshold values
+    let mut results: [f32; NUM_ITERS as usize] = [0f32; NUM_ITERS as usize];
 
-    //populate array with consecutive numbers where 0 is rock and give it a rock boarder
-    for i in NCOLS..(LEN - NCOLS) {
-        if (i + 1) % NCOLS != 1 && (i + 1) % NCOLS != 0 && i % 5 > 0 {
-            arr[i] = i as u32;
+    for i in 0..NUM_ITERS {
+        // create fully blocked lattice
+        let mut percolate: bool = false;
+        let mut arr: [u32; LEN] = [0u32; LEN];
+
+        for j in 1..=LEN {
+            // randomly pick blocked site to open
+            let mut open_site: bool = false;
+            let mut site: usize = rng.gen_range(0..LEN);
+            while !open_site {
+                if arr[site] == 0 {
+                    open_site = true
+                } else {
+                    site = rng.gen_range(0..LEN);
+                }
+            }
+
+            // assign newly opened site a new number
+            arr[site] = j as u32;
+
+            // create clusters
+            clustering(&mut arr);
+            let clusters: HashMap<u32, u32> = count_clusters(&mut arr);
+
+            percolate = check_percolation(&arr, &clusters);
+            if percolate {
+                // print_array(&arr);
+                results[i as usize] = (j as f32) / (LEN as f32);
+                break;
+            }
+        }
+        if !percolate {
+            println!("Did not percolate!");
         }
     }
-    print_array(&arr);
 
-    // create clusters
-    let loops: u32 = clustering(&mut arr);
-    print_array(&arr);
-
-    let clusters: HashMap<u32, u32> = count_clusters(&mut arr);
-    let sorted_clusters: Vec<(u32, u32)> = sort_clusters(&clusters);
-
-    for (cluster, size) in sorted_clusters.iter() {
-        println!("Cluster {:0>3} size: {}", cluster, size);
+    let mut sum: f32 = 0.0;
+    for &p in &results {
+        sum += p;
     }
-
-    println!("\nTotal cluster: {}\n", clusters.len());
-
-    check_percolation(&arr, &clusters);
-
-    println!("\nPercolation completed in {loops} loops (Max loops {LEN})");
+    let critical_p: f32 = sum / results.len() as f32;
+    let a: String = format!("Iterations:     {NUM_ITERS}");
+    let b: String = format!("[NROWS, NCOLS]: [{NROWS}, {NCOLS}]");
+    let c: String = format!("p*:             {critical_p:.3}");
+    let out: String = [a, b, c].join("\n");
+    println!("{out}");
 }
