@@ -1,4 +1,5 @@
 use crate::consts::*;
+use plotters::prelude::*;
 
 pub fn get_neigbors(&i: &usize) -> (Option<usize>, Option<usize>, Option<usize>, Option<usize>) {
     // Get neighbors in lattice
@@ -21,6 +22,22 @@ pub fn get_neigbors(&i: &usize) -> (Option<usize>, Option<usize>, Option<usize>,
     };
 
     (up, down, left, right)
+}
+
+pub fn plot_array(&arr: &[u32; LEN], perc_cluster: u32, name: &str) {
+    let root = BitMapBackend::new(name, (NCOLS as u32, NROWS as u32)).into_drawing_area();
+
+    let areas = root.split_evenly((NCOLS, NROWS));
+
+    for (area, i) in areas.into_iter().zip(0..LEN) {
+        if arr[i] == 0u32 {
+            let _ = area.fill(&BLACK);
+        } else if arr[i] == perc_cluster {
+            let _ = area.fill(&RGBColor(166, 235, 153));
+        } else {
+            let _ = area.fill(&RGBColor(181, 215, 228));
+        }
+    }
 }
 
 pub fn print_array(arr: &[u32; LEN]) {

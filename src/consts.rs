@@ -1,4 +1,4 @@
-pub const NROWS: usize = 50;
-pub const NCOLS: usize = 50;
+pub const NROWS: usize = 100;
+pub const NCOLS: usize = 100;
 pub const LEN: usize = NROWS * NCOLS;
-pub const NUM_ITERS: u32 = 10;
+pub const NUM_ITERS: u32 = 1;
